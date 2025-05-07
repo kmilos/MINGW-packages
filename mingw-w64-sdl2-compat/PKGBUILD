@@ -1,0 +1,64 @@
+# Maintainer: Christoph Reiter <reiter.christoph@gmail.com>
+
+_realname=sdl2-compat
+pkgbase="mingw-w64-${_realname}"
+pkgname=("${MINGW_PACKAGE_PREFIX}-${_realname}")
+pkgver=2.32.56
+pkgrel=1
+pkgdesc="An SDL2 compatibility layer that uses SDL3 behind the scenes (mingw-w64)"
+arch=('any')
+mingw_arch=('mingw64' 'ucrt64' 'clang64' 'clangarm64')
+url="https://github.com/libsdl-org/sdl2-compat"
+license=('spdx:Zlib')
+conflicts=("${MINGW_PACKAGE_PREFIX}-SDL2")
+provides=("${MINGW_PACKAGE_PREFIX}-SDL2")
+depends=("${MINGW_PACKAGE_PREFIX}-sdl3")
+makedepends=("${MINGW_PACKAGE_PREFIX}-cmake"
+             "${MINGW_PACKAGE_PREFIX}-ninja"
+             "${MINGW_PACKAGE_PREFIX}-cc")
+source=("https://github.com/libsdl-org/${_realname}/releases/download/release-${pkgver}/${_realname}-${pkgver}.tar.gz{,.sig}"
+        "0001-just-build-normal.patch"
+        "0002-sdl-config-win-paths.patch")
+sha256sums=('27e845b1b7dc0a91a85f1a1f18892ed205adb38caf767741eb258008d8264de0'
+            'SKIP'
+            'a368e638dd050042c3811087a63670d61c0234ac252b1f5c10212b4eb835c47c'
+            '731f9475c171b034c10d57d2c13fb822cf46fba61b5fc938365c11ca70b2fba7')
+
+prepare() {
+  cd "${_realname}-${pkgver}"
+
+  patch -Np1 -i "${srcdir}/0001-just-build-normal.patch"
+  patch -Np1 -i "${srcdir}/0002-sdl-config-win-paths.patch"
+}
+
+build() {
+  declare -a extra_config
+  if check_option "debug" "n"; then
+    extra_config+=("-DCMAKE_BUILD_TYPE=Release")
+  else
+    extra_config+=("-DCMAKE_BUILD_TYPE=Debug")
+  fi
+
+  MSYS2_ARG_CONV_EXCL="-DCMAKE_INSTALL_PREFIX=" \
+    cmake \
+      -GNinja \
+      -DCMAKE_INSTALL_PREFIX="${MINGW_PREFIX}" \
+      "${extra_config[@]}" \
+      -DBUILD_SHARED_LIBS=ON \
+      -S "${_realname}-${pkgver}" \
+      -B "build-${MSYSTEM}"
+
+  "${MINGW_PREFIX}"/bin/cmake.exe --build .
+}
+
+check() {
+  cd "${srcdir}/build-${MSYSTEM}"
+
+  "${MINGW_PREFIX}"/bin/ctest.exe . || warning "Tests failed"
+}
+
+package() {
+  DESTDIR="${pkgdir}" cmake --install "build-${MSYSTEM}"
+
+  install -Dm644 "${srcdir}/${_realname}-${pkgver}/LICENSE.txt" "${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE"
+}
