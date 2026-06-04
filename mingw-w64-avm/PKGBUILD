@@ -1,0 +1,62 @@
+# Maintainer: Alexey Pavlov <alexpux@gmail.com>
+
+_realname=avm
+pkgbase=mingw-w64-${_realname}
+pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='AV2 codec library (mingw-w64)'
+arch=('any')
+mingw_arch=('ucrt64' 'clang64' 'clangarm64')
+url="https://aomedia.org/"
+msys2_repository_url="https://github.com/AOMediaCodec/avm"
+msys2_changelog_url="https://github.com/AOMediaCodec/avm/blob/main/CHANGELOG"
+msys2_references=(
+  "anitya: 390467"
+)
+license=('spdx:BSD-3-Clause-Clear')
+depends=("${MINGW_PACKAGE_PREFIX}-cc-libs"
+         "${MINGW_PACKAGE_PREFIX}-libwinpthread")
+makedepends=("${MINGW_PACKAGE_PREFIX}-cmake"
+             "${MINGW_PACKAGE_PREFIX}-ninja"
+             "${MINGW_PACKAGE_PREFIX}-cc"
+             $([[ ${CARCH} == aarch64 ]] || echo "${MINGW_PACKAGE_PREFIX}-nasm")
+             "${MINGW_PACKAGE_PREFIX}-git"
+             "${MINGW_PACKAGE_PREFIX}-perl")
+source=("https://github.com/AOMediaCodec/${_realname}/archive/v${pkgver}/${_realname}-${pkgver}.tar.gz")
+sha256sums=('073fc0f92a036a97b0067b6173e6367f1cf349e0fcd9fcb6a641b6d5720591ac')
+
+build() {
+  declare -a extra_config
+  if check_option "debug" "n"; then
+    extra_config+=("-DCMAKE_BUILD_TYPE=Release")
+  else
+    extra_config+=("-DCMAKE_BUILD_TYPE=Debug")
+  fi
+
+  MSYS2_ARG_CONV_EXCL="-DCMAKE_INSTALL_PREFIX=" \
+    cmake \
+      -GNinja \
+      -DCMAKE_INSTALL_PREFIX=${MINGW_PREFIX} \
+      -DCMAKE_DLL_NAME_WITH_SOVERSION=ON \
+      "${extra_config[@]}" \
+      -DBUILD_SHARED_LIBS=ON \
+      -DENABLE_DOCS=OFF \
+      -DENABLE_TESTS=OFF \
+      -DENABLE_TOOLS=OFF \
+      -DCONFIG_MULTITHREAD=1 \
+      -DCONFIG_ML_PART_SPLIT=0 \
+      -DCONFIG_DIP_EXT_PRUNING=0 \
+      -DCONFIG_TENSORFLOW_LITE=0 \
+      -S "${_realname}-${pkgver}" \
+      -B "build-${MSYSTEM}"
+
+  cmake --build "build-${MSYSTEM}"
+}
+
+package() {
+  DESTDIR="${pkgdir}" cmake --install "build-${MSYSTEM}"
+
+  install -Dm644 "${_realname}-${pkgver}/LICENSE" "${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/LICENSE"
+  install -Dm644 "${_realname}-${pkgver}/PATENTS" "${pkgdir}${MINGW_PREFIX}/share/licenses/${_realname}/PATENTS"
+}
